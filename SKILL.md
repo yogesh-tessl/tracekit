@@ -1,122 +1,86 @@
-# tracekit skill
+---
+name: tracekit
+description: "Capture, list, and analyze coding-agent session traces for token and cost inefficiencies. Parses traces from Claude Code, OpenCode, and Codex to detect retry loops, redundant reads, context bloat, edit cascades, and tool fanout. Use when reviewing session costs, analyzing token usage, finding expensive sessions, detecting agent inefficiency patterns, generating cost reports, or capturing traces at session end."
+---
 
-Use tracekit to capture, list, and analyze coding-agent session traces for token/cost inefficiencies.
+# tracekit
 
-## When to use this skill
-
-- A user asks to review their session costs, token usage, or agent efficiency
-- A user wants to know which sessions were most expensive
-- A user wants to find retry loops, redundant reads, or context bloat in past sessions
-- A user is ending a session and wants to capture and analyze it
-
-## Binary location
-
-After building: `./target/release/tracekit` or `tracekit` if installed globally.
+Analyze coding-agent session traces to find token waste and cost inefficiencies across Claude Code, OpenCode, and Codex.
 
 ## Workflow
 
 ### 1. List sessions
 
 ```bash
-# All agents, newest first
 tracekit list sessions
-
-# Filter by agent
 tracekit list sessions --agent claude
-tracekit list sessions --agent opencode
-tracekit list sessions --agent codex
-
-# Filter by time window
 tracekit list sessions --since 2026-01-01
-
-# JSON output for programmatic use
 tracekit list sessions --format json
 ```
 
 ### 2. Analyze a session
 
 ```bash
-# By session ID (prefix match works)
 tracekit analyze session --session-id <id>
-
-# Most recent N sessions
 tracekit analyze recent --limit 10
-
-# Most expensive sessions
 tracekit analyze expensive --top 20
-
-# JSON output
 tracekit analyze session --session-id <id> --format json
 ```
 
 ### 3. Generate a report
 
 ```bash
-# Terminal table (default)
 tracekit report session --session-id <id>
-
-# HTML report (opens as file)
 tracekit report session --session-id <id> --format html --out report.html
-
-# Full aggregate HTML report
 tracekit report aggregate --format html --out report.html
-
-# JSON report for automation
 tracekit report session --session-id <id> --format json --out report.json
 ```
 
-### 4. Capture traces at session end
+### 4. Capture traces
 
 ```bash
-# Discover all sessions
 tracekit capture all
-
-# Recent sessions only
 tracekit capture recent --limit 5
-
-# Specific session
 tracekit capture session --session-id <id>
 ```
 
 ## Common patterns
 
-**Analyze the current session (Claude Code):**
+**Analyze current Claude Code session:**
 ```bash
-# Get your current session ID from Claude Code, then:
 tracekit analyze session --session-id <current-session-id> --agent claude
 ```
 
-**Find sessions with the most wasted tokens:**
+**Find most wasteful sessions:**
 ```bash
 tracekit analyze expensive --top 20 --format json | jq '.sessions[] | {id: .session.session_id, cost: .session.total_cost_usd, findings: (.findings | length)}'
 ```
 
-**Check for specific inefficiency types:**
+**Filter by inefficiency type:**
 ```bash
 tracekit analyze recent --limit 20 --format json | jq '[.sessions[].findings[] | select(.kind == "retry_loop")]'
 ```
 
-**Generate a weekly cost report:**
+**Weekly cost report:**
 ```bash
 tracekit report aggregate --since $(date -u -v-7d +%Y-%m-%d) --format html --out weekly-report.html
 ```
 
-## Interpreting findings
+## Findings reference
 
 | Finding | Fix |
 |---|---|
-| `RETRY_LOOP` | Agent retried a failing tool repeatedly. Fix the underlying tool error or give the agent better error-handling instructions. |
-| `EDIT_CASCADE` | Edit tool kept failing on same file. Check file permissions or patch format. |
-| `TOOL_FANOUT` | Many calls to same tool in one turn. Use batch tool calls or parallel execution instructions. |
-| `REDUNDANT_REREAD` | Same file read many times. Cache file content in context instead of re-reading. |
-| `CONTEXT_BLOAT` | Input token spike. Compress tool outputs before feeding back, or use summarization. |
-| `ERROR_REPROMPT_CHURN` | Repeating the same error without recovery. Add explicit error-handling paths to system prompt. |
-| `SUBAGENT_OVERHEAD` | Many sidechain agents. Evaluate if tasks need subagents or can be done inline. |
+| `RETRY_LOOP` | Fix the underlying tool error or add error-handling instructions. |
+| `EDIT_CASCADE` | Check file permissions or patch format. |
+| `TOOL_FANOUT` | Use batch tool calls or parallel execution. |
+| `REDUNDANT_REREAD` | Cache file content in context instead of re-reading. |
+| `CONTEXT_BLOAT` | Compress tool outputs or use summarization. |
+| `ERROR_REPROMPT_CHURN` | Add explicit error-handling paths to system prompt. |
+| `SUBAGENT_OVERHEAD` | Evaluate if tasks need subagents or can be done inline. |
 
 ## Notes
 
-- Claude Code and OpenCode provide real cost data where available
-- Codex rollout files don't include per-call token counts; only structural analysis is available
+- Claude Code and OpenCode provide real cost data; Codex supports structural analysis only
 - Session IDs support prefix matching (first 8 chars usually sufficient)
 - Use `--agent all` (default) to search across all installed agents
-- Inspect where tokens were wasted, and update your agents md file to avoid those paths in future
+- Binary location: `./target/release/tracekit` or `tracekit` if installed globally
